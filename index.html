@@ -197,10 +197,10 @@
             for (let attempt = 0; attempt < maxAttempts; attempt++) {
                 try {
                     const city = cities[Math.floor(Math.random() * cities.length)];
-                    const delta = 0.01;
+                    const delta = 0.001;
                     const bbox = `${city.lon - delta},${city.lat - delta},${city.lon + delta},${city.lat + delta}`;
 
-                    const url = `https://graph.mapillary.com/images?access_token=${MAPILLARY_TOKEN}&fields=thumb_1024_url,computed_geometry&bbox=${bbox}&limit=10`;
+                    const url = `https://graph.mapillary.com/images?access_token=${MAPILLARY_TOKEN}&fields=thumb_1024_url,computed_geometry&bbox=${bbox}&limit=5`;
 
                     const response = await fetch(url);
 
