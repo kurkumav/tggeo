@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python *)",
+      "Bash(pip install *)",
+      "Bash(curl -s \"https://graph.mapillary.com/images?access_token=MLY|26318369421103951|7a3e1521c5a4d41a770f87bbddff76e7&fields=thumb_1024_url,computed_geometry&bbox=37.5676,55.7058,37.6676,55.8058&limit=20\")",
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git branch *)",
+      "Bash(git remote *)",
+      "Bash(git push *)",
+      "Bash(git config *)",
+      "Bash(curl -L -s https://kurkumav.github.io/tggeo)",
+      "Bash(curl -s \"https://graph.mapillary.com/images?access_token=MLY|26318369421103951|7a3e1521c5a4d41a770f87bbddff76e7&fields=thumb_1024_url,computed_geometry&bbox=37.6076,55.7458,37.6276,55.7658&limit=10\")",
+      "Bash(curl *)",
+      "Bash(git *)"
+    ]
+  }
+}
