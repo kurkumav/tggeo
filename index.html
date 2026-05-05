@@ -98,6 +98,70 @@
             pointer-events: none;
         }
 
+        #result {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            z-index: 2000;
+            text-align: center;
+            max-width: 90%;
+            min-width: 280px;
+        }
+
+        #result.dark {
+            background: #2c2c2e;
+            color: white;
+        }
+
+        #result h2 {
+            margin: 0 0 20px 0;
+            font-size: 24px;
+        }
+
+        #result .score {
+            font-size: 48px;
+            font-weight: bold;
+            color: #2ea043;
+            margin: 10px 0;
+        }
+
+        #result .distance {
+            font-size: 18px;
+            color: #666;
+            margin: 10px 0;
+        }
+
+        #result.dark .distance {
+            color: #999;
+        }
+
+        #result .accuracy {
+            font-size: 32px;
+            margin: 20px 0;
+        }
+
+        #play-again {
+            background: #2ea043;
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+
+        #play-again:active {
+            background: #268038;
+        }
+
         .leaflet-container {
             height: 100%;
             width: 100%;
@@ -120,6 +184,13 @@
 
         <div id="map">
             <div id="hint">📍 Нажми на карту, чтобы выбрать место</div>
+            <div id="result">
+                <div class="accuracy" id="accuracy-emoji"></div>
+                <h2 id="accuracy-text"></h2>
+                <div class="score" id="score-value"></div>
+                <div class="distance" id="distance-value"></div>
+                <button id="play-again">🎮 Играть еще раз</button>
+            </div>
         </div>
     </div>
 
@@ -280,23 +351,90 @@
                 return;
             }
 
-            tg.MainButton.showProgress();
+            // Вычисляем расстояние
+            const R = 6371; // Радиус Земли в км
+            const dLat = (realLat - guess.lat) * Math.PI / 180;
+            const dLon = (realLon - guess.lon) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(guess.lat * Math.PI / 180) * Math.cos(realLat * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            const distance = R * c;
 
-            const result = {
-                guess_lat: guess.lat,
-                guess_lon: guess.lon,
-                real_lat: realLat,
-                real_lon: realLon
-            };
+            // Вычисляем очки
+            const score = Math.max(0, Math.round(5000 - distance));
 
-            try {
-                tg.sendData(JSON.stringify(result));
-                tg.close();
-            } catch (error) {
-                console.error('Ошибка отправки данных:', error);
-                tg.MainButton.hideProgress();
-                tg.showAlert("Ошибка отправки данных");
+            // Определяем точность
+            let accuracy, accuracyEmoji;
+            if (distance < 1) {
+                accuracy = "Невероятно точно!";
+                accuracyEmoji = "🎯";
+            } else if (distance < 10) {
+                accuracy = "Отлично!";
+                accuracyEmoji = "🎖️";
+            } else if (distance < 100) {
+                accuracy = "Хорошо!";
+                accuracyEmoji = "👍";
+            } else if (distance < 500) {
+                accuracy = "Неплохо!";
+                accuracyEmoji = "👌";
+            } else {
+                accuracy = "Попробуй еще раз!";
+                accuracyEmoji = "🤔";
             }
+
+            // Показываем правильную точку на карте
+            const realMarker = L.marker([realLat, realLon], {
+                icon: L.icon({
+                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41],
+                    popupAnchor: [1, -34],
+                    shadowSize: [41, 41]
+                })
+            }).addTo(map);
+
+            // Рисуем линию между точками
+            const line = L.polyline([
+                [guess.lat, guess.lon],
+                [realLat, realLon]
+            ], {
+                color: '#ff6b6b',
+                weight: 3,
+                opacity: 0.7,
+                dashArray: '10, 10'
+            }).addTo(map);
+
+            // Подгоняем карту чтобы показать обе точки
+            map.fitBounds([
+                [guess.lat, guess.lon],
+                [realLat, realLon]
+            ], { padding: [50, 50] });
+
+            // Показываем результат
+            document.getElementById('accuracy-emoji').textContent = accuracyEmoji;
+            document.getElementById('accuracy-text').textContent = accuracy;
+            document.getElementById('score-value').textContent = score + ' очков';
+            document.getElementById('distance-value').textContent = '📏 Расстояние: ' + distance.toFixed(2) + ' км';
+
+            const resultDiv = document.getElementById('result');
+            if (tg.colorScheme === 'dark') {
+                resultDiv.classList.add('dark');
+            }
+            resultDiv.style.display = 'block';
+
+            // Скрываем кнопку Telegram
+            tg.MainButton.hide();
+
+            // Сохраняем маркеры для очистки
+            window.realMarker = realMarker;
+            window.line = line;
+        });
+
+        // Кнопка "Играть еще раз"
+        document.getElementById('play-again').addEventListener('click', function() {
+            location.reload();
         });
 
         // Адаптация под тему Telegram
