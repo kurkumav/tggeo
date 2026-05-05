@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GeoGuessr Mini</title>
+
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            overflow: hidden;
+        }
+
+        #container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        #photo-container {
+            height: 40%;
+            position: relative;
+            background: #000;
+        }
+
+        #photo {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 18px;
+            text-align: center;
+        }
+
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        #error {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 59, 48, 0.9);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            max-width: 80%;
+        }
+
+        #map {
+            flex: 1;
+            position: relative;
+        }
+
+        #hint {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            z-index: 1000;
+            font-size: 14px;
+            pointer-events: none;
+        }
+
+        .leaflet-container {
+            height: 100%;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="photo-container">
+            <img id="photo" style="display: none;"/>
+            <div id="loading">
+                <div class="spinner"></div>
+                <div>Загрузка локации...</div>
+            </div>
+            <div id="error">
+                <div style="font-size: 24px; margin-bottom: 10px;">⚠️</div>
+                <div id="error-text">Ошибка загрузки</div>
+            </div>
+        </div>
+
+        <div id="map">
+            <div id="hint">📍 Нажми на карту, чтобы выбрать место</div>
+        </div>
+    </div>
+
+    <script>
+        // Конфигурация
+        const MAPILLARY_TOKEN = "MLY|26318369421103951|7a3e1521c5a4d41a770f87bbddff76e7";
+
+        const cities = [
+            {name: "Москва", lat: 55.7558, lon: 37.6176},
+            {name: "Санкт-Петербург", lat: 59.9343, lon: 30.3351},
+            {name: "Париж", lat: 48.8566, lon: 2.3522},
+            {name: "Лондон", lat: 51.5074, lon: -0.1278},
+            {name: "Нью-Йорк", lat: 40.7128, lon: -74.0060},
+            {name: "Лос-Анджелес", lat: 34.0522, lon: -118.2437},
+            {name: "Токио", lat: 35.6895, lon: 139.6917},
+            {name: "Сингапур", lat: 1.3521, lon: 103.8198},
+        ];
+
+        // Состояние
+        let guess = null;
+        let realLat = null;
+        let realLon = null;
+        let marker = null;
+
+        // Telegram WebApp
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
+
+        // Инициализация карты
+        const map = L.map('map', {
+            zoomControl: true,
+            attributionControl: false
+        }).setView([20, 0], 2);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        // Обработчик клика по карте
+        map.on('click', function(e) {
+            guess = {
+                lat: e.latlng.lat,
+                lon: e.latlng.lng
+            };
+
+            if (marker) {
+                map.removeLayer(marker);
+            }
+
+            marker = L.marker(e.latlng, {
+                icon: L.icon({
+                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41],
+                    popupAnchor: [1, -34],
+                    shadowSize: [41, 41]
+                })
+            }).addTo(map);
+
+            // Скрыть подсказку после первого клика
+            document.getElementById('hint').style.display = 'none';
+
+            // Активировать кнопку
+            tg.MainButton.enable();
+            tg.MainButton.color = '#2ea043';
+        });
+
+        // Функция загрузки изображения
+        async function fetchImage() {
+            const maxAttempts = 5;
+
+            for (let attempt = 0; attempt < maxAttempts; attempt++) {
+                try {
+                    const city = cities[Math.floor(Math.random() * cities.length)];
+                    const delta = 0.01;
+                    const bbox = `${city.lon - delta},${city.lat - delta},${city.lon + delta},${city.lat + delta}`;
+
+                    const url = `https://graph.mapillary.com/images?access_token=${MAPILLARY_TOKEN}&fields=thumb_1024_url,computed_geometry&bbox=${bbox}&limit=10`;
+
+                    const response = await fetch(url);
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+
+                    const data = await response.json();
+
+                    if (!data.data || data.data.length === 0) {
+                        console.log(`Попытка ${attempt + 1}: нет изображений для ${city.name}`);
+                        continue;
+                    }
+
+                    const img = data.data[Math.floor(Math.random() * data.data.length)];
+                    const coords = img.computed_geometry.coordinates;
+
+                    return {
+                        lat: coords[1],
+                        lon: coords[0],
+                        image: img.thumb_1024_url
+                    };
+
+                } catch (error) {
+                    console.error(`Попытка ${attempt + 1} не удалась:`, error);
+                    if (attempt === maxAttempts - 1) {
+                        throw error;
+                    }
+                }
+            }
+
+            throw new Error('Не удалось загрузить изображение после всех попыток');
+        }
+
+        // Загрузка локации
+        fetchImage()
+            .then(data => {
+                realLat = data.lat;
+                realLon = data.lon;
+
+                const photoEl = document.getElementById('photo');
+                photoEl.onload = function() {
+                    document.getElementById('loading').style.display = 'none';
+                    photoEl.style.display = 'block';
+                };
+                photoEl.onerror = function() {
+                    showError('Ошибка загрузки изображения');
+                };
+                photoEl.src = data.image;
+            })
+            .catch(error => {
+                console.error('Ошибка:', error);
+                showError('Не удалось загрузить локацию. Попробуй позже.');
+            });
+
+        // Показать ошибку
+        function showError(message) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error-text').textContent = message;
+            document.getElementById('error').style.display = 'block';
+            tg.MainButton.hide();
+        }
+
+        // Настройка кнопки Telegram
+        tg.MainButton.setText("🎯 Угадать");
+        tg.MainButton.disable();
+        tg.MainButton.show();
+
+        tg.MainButton.onClick(function() {
+            if (!guess) {
+                tg.showAlert("Выбери точку на карте!");
+                return;
+            }
+
+            if (realLat === null || realLon === null) {
+                tg.showAlert("Локация еще загружается...");
+                return;
+            }
+
+            tg.MainButton.showProgress();
+
+            const result = {
+                guess_lat: guess.lat,
+                guess_lon: guess.lon,
+                real_lat: realLat,
+                real_lon: realLon
+            };
+
+            try {
+                tg.sendData(JSON.stringify(result));
+                tg.close();
+            } catch (error) {
+                console.error('Ошибка отправки данных:', error);
+                tg.MainButton.hideProgress();
+                tg.showAlert("Ошибка отправки данных");
+            }
+        });
+
+        // Адаптация под тему Telegram
+        if (tg.colorScheme === 'dark') {
+            document.body.style.background = '#1c1c1e';
+        }
+    </script>
+</body>
+</html>
