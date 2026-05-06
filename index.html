@@ -367,22 +367,17 @@
             const score = Math.max(0, Math.round(5000 - distance));
 
             // Определяем точность
-            let accuracy, accuracyEmoji;
+            let accuracy;
             if (distance < 1) {
                 accuracy = "Невероятно точно!";
-                accuracyEmoji = "🎯";
             } else if (distance < 10) {
                 accuracy = "Отлично!";
-                accuracyEmoji = "🎖️";
             } else if (distance < 100) {
                 accuracy = "Хорошо!";
-                accuracyEmoji = "👍";
             } else if (distance < 500) {
                 accuracy = "Неплохо!";
-                accuracyEmoji = "👌";
             } else {
                 accuracy = "Попробуй еще раз!";
-                accuracyEmoji = "🤔";
             }
 
             // Показываем правильную точку на карте
