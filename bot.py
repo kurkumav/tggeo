@@ -82,20 +82,20 @@ async def handle_webapp_data(message: Message):
 
         # Определение точности
         if distance < 1:
-            accuracy = "🎯 Невероятно точно!"
+            accuracy = "Невероятно точно!"
         elif distance < 10:
-            accuracy = "🎖️ Отлично!"
+            accuracy = "Отлично!"
         elif distance < 100:
-            accuracy = "👍 Хорошо!"
+            accuracy = "Хорошо!"
         elif distance < 500:
-            accuracy = "👌 Неплохо!"
+            accuracy = "Неплохо!"
         else:
-            accuracy = "🤔 Попробуй еще раз!"
+            accuracy = "Попробуй еще раз!"
 
         await message.answer(
             f"{accuracy}\n\n"
-            f"📏 Расстояние: {distance:.2f} км\n"
-            f"🏆 Очки: {score}\n\n"
+            f"Расстояние: {distance:.2f} км\n"
+            f"Очки: {score}\n\n"
             f"Сыграй еще раз! /start"
         )
 
