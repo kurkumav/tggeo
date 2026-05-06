@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+from aiohttp import web
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, WebAppInfo, InlineKeyboardButton, InlineKeyboardMarkup
 from geopy.distance import geodesic
@@ -132,15 +133,36 @@ async def handle_unknown(message: Message):
     )
 
 
+async def health_check(request):
+    """Health check endpoint для Render"""
+    return web.Response(text="OK")
+
+
 async def main():
-    """Запуск бота"""
+    """Запуск бота и веб-сервера"""
     logger.info("Бот запущен...")
+
+    # Запуск веб-сервера для health check
+    app = web.Application()
+    app.router.add_get('/', health_check)
+    app.router.add_get('/health', health_check)
+
+    runner = web.AppRunner(app)
+    await runner.setup()
+
+    port = int(os.getenv('PORT', 10000))
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+    logger.info(f"Health check сервер запущен на порту {port}")
+
+    # Запуск бота
     try:
         await dp.start_polling(bot)
     except Exception as e:
         logger.error(f"Критическая ошибка: {e}", exc_info=True)
     finally:
         await bot.session.close()
+        await runner.cleanup()
 
 
 if __name__ == "__main__":
