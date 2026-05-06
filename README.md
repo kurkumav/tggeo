@@ -84,13 +84,16 @@ python bot.py
 
 ```
 tggeo/
-├── bot.py                    # Telegram бот
-├── index.html                # WebApp интерфейс
+├── bot.py                    # Telegram бот (aiogram)
+├── index.html                # WebApp интерфейс (статический)
 ├── requirements.txt          # Python зависимости
+├── Procfile                  # Команда запуска для Render
+├── runtime.txt               # Версия Python для Render
+├── render.yaml               # Конфигурация Render
 ├── .env.example              # Пример конфигурации
 ├── .gitignore                # Git ignore
 ├── README.md                 # Документация
-├── QUICKSTART.md             # Быстрый старт
+├── DEPLOY.md                 # Инструкция по деплою
 ├── FAQ.md                    # Частые вопросы
 ├── CHECKLIST.md              # Чеклист запуска
 └── CLAUDE.md                 # Техническая документация
@@ -130,6 +133,26 @@ tggeo/
 - 🇺🇸 Лос-Анджелес
 - 🇯🇵 Токио
 - 🇸🇬 Сингапур
+
+## 🚀 Деплой (бесплатно!)
+
+### Render.com (рекомендуется)
+
+**Полная инструкция:** см. [DEPLOY.md](DEPLOY.md)
+
+**Быстрый старт:**
+1. Загрузите код на GitHub
+2. Зарегистрируйтесь на [render.com](https://render.com)
+3. Создайте Web Service из вашего репозитория
+4. Добавьте переменные окружения (токены)
+5. Деплой! 🎉
+
+**Лайфхак:** Используйте [cron-job.org](https://cron-job.org) для пинга каждые 10 минут — бот не будет засыпать.
+
+### Альтернативы
+- **Railway.app** - $5 кредитов/месяц
+- **Fly.io** - 3 бесплатных VM
+- **VPS** - $4-6/месяц (полный контроль)
 
 ## 🔧 Настройка для production
 
