@@ -270,7 +270,7 @@
             for (let attempt = 0; attempt < maxAttempts; attempt++) {
                 try {
                     const city = cities[Math.floor(Math.random() * cities.length)];
-                    const delta = 0.001;
+                    const delta = 0.0005;
                     const bbox = `${city.lon - delta},${city.lat - delta},${city.lon + delta},${city.lat + delta}`;
 
                     const url = `https://graph.mapillary.com/images?access_token=${MAPILLARY_TOKEN}&fields=thumb_1024_url,computed_geometry&bbox=${bbox}&limit=5`;
@@ -296,17 +296,13 @@
                         lat: coords[1],
                         lon: coords[0]
                     };
-                        lat: coords[1],
-                        lon: coords[0],
-                        image: img.thumb_1024_url
-                    };
 
                 } catch (error) {
                     console.error(`Попытка ${attempt + 1} не удалась:`, error);
                     if (attempt === maxAttempts - 1) {
                         throw error;
                     }
-                } catch (error) {
+                }
                     console.error(`Попытка ${attempt + 1} не удалась:`, error);
                     if (attempt === maxAttempts - 1) {
                         throw error;
