@@ -198,18 +198,9 @@
 
     <script>
         // Конфигурация
-        const MAPILLARY_TOKEN = "YOUR_MAPILLARY_TOKEN_HERE";
-
-        const cities = [
-            {name: "Москва", lat: 55.7558, lon: 37.6176},
-            {name: "Санкт-Петербург", lat: 59.9343, lon: 30.3351},
-            {name: "Париж", lat: 48.8566, lon: 2.3522},
-            {name: "Лондон", lat: 51.5074, lon: -0.1278},
-            {name: "Нью-Йорк", lat: 40.7128, lon: -74.0060},
-            {name: "Лос-Анджелес", lat: 34.0522, lon: -118.2437},
-            {name: "Токио", lat: 35.6895, lon: 139.6917},
-            {name: "Сингапур", lat: 1.3521, lon: 103.8198},
-        ];
+        const API_URL = window.location.hostname === 'localhost'
+            ? 'http://localhost:10000'
+            : 'https://tggeo.onrender.com';
 
         // Состояние
         let guess = null;
@@ -269,13 +260,7 @@
 
             for (let attempt = 0; attempt < maxAttempts; attempt++) {
                 try {
-                    const city = cities[Math.floor(Math.random() * cities.length)];
-                    const delta = 0.001;
-                    const bbox = `${city.lon - delta},${city.lat - delta},${city.lon + delta},${city.lat + delta}`;
-
-                    const url = `https://graph.mapillary.com/images?access_token=${MAPILLARY_TOKEN}&fields=thumb_1024_url,computed_geometry&bbox=${bbox}&limit=5`;
-
-                    const response = await fetch(url);
+                    const response = await fetch(`${API_URL}/api/photo`);
 
                     if (!response.ok) {
                         throw new Error(`HTTP ${response.status}`);
@@ -283,20 +268,25 @@
 
                     const data = await response.json();
 
-                    if (!data.data || data.data.length === 0) {
-                        console.log(`Попытка ${attempt + 1}: нет изображений для ${city.name}`);
-                        continue;
+                    if (data.error) {
+                        throw new Error(data.error);
                     }
 
-                    const img = data.data[Math.floor(Math.random() * data.data.length)];
-                    const coords = img.computed_geometry.coordinates;
-
                     return {
+                        url: data.image_url,
+                        lat: data.lat,
+                        lon: data.lon
+                    };
                         lat: coords[1],
                         lon: coords[0],
                         image: img.thumb_1024_url
                     };
 
+                } catch (error) {
+                    console.error(`Попытка ${attempt + 1} не удалась:`, error);
+                    if (attempt === maxAttempts - 1) {
+                        throw error;
+                    }
                 } catch (error) {
                     console.error(`Попытка ${attempt + 1} не удалась:`, error);
                     if (attempt === maxAttempts - 1) {
@@ -322,7 +312,7 @@
                 photoEl.onerror = function() {
                     showError('Ошибка загрузки изображения');
                 };
-                photoEl.src = data.image;
+                photoEl.src = data.url;
             })
             .catch(error => {
                 console.error('Ошибка:', error);

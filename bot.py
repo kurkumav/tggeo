@@ -2,6 +2,8 @@ import asyncio
 import json
 import logging
 import os
+import random
+import requests
 from aiohttp import web
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, WebAppInfo, InlineKeyboardButton, InlineKeyboardMarkup
@@ -21,14 +23,66 @@ logger = logging.getLogger(__name__)
 # Конфигурация
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 WEBAPP_URL = os.getenv("WEBAPP_URL")
+MAPILLARY_TOKEN = os.getenv("MAPILLARY_TOKEN")
 
 if not TOKEN:
     raise ValueError("TELEGRAM_BOT_TOKEN не найден в переменных окружения")
 if not WEBAPP_URL:
     raise ValueError("WEBAPP_URL не найден в переменных окружения")
+if not MAPILLARY_TOKEN:
+    raise ValueError("MAPILLARY_TOKEN не найден в переменных окружения")
 
 bot = Bot(TOKEN)
 dp = Dispatcher()
+
+# Города для случайного выбора
+CITIES = [
+    {"name": "Москва", "lat": 55.7558, "lon": 37.6176},
+    {"name": "Санкт-Петербург", "lat": 59.9343, "lon": 30.3351},
+    {"name": "Париж", "lat": 48.8566, "lon": 2.3522},
+    {"name": "Лондон", "lat": 51.5074, "lon": -0.1278},
+    {"name": "Нью-Йорк", "lat": 40.7128, "lon": -74.0060},
+    {"name": "Лос-Анджелес", "lat": 34.0522, "lon": -118.2437},
+    {"name": "Токио", "lat": 35.6895, "lon": 139.6917},
+    {"name": "Сингапур", "lat": 1.3521, "lon": 103.8198},
+]
+
+
+def get_random_photo():
+    """Получить случайное фото из Mapillary"""
+    max_attempts = 5
+
+    for attempt in range(max_attempts):
+        city = random.choice(CITIES)
+        lat, lon = city["lat"], city["lon"]
+
+        # Случайное смещение (±0.05 градуса = ~5км)
+        lat += random.uniform(-0.05, 0.05)
+        lon += random.uniform(-0.05, 0.05)
+
+        # Создаем bbox
+        delta = 0.01
+        bbox = f"{lon-delta},{lat-delta},{lon+delta},{lat+delta}"
+
+        url = f"https://graph.mapillary.com/images?access_token={MAPILLARY_TOKEN}&fields=thumb_1024_url,computed_geometry&bbox={bbox}&limit=5"
+
+        try:
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+
+            if data.get("data") and len(data["data"]) > 0:
+                image = random.choice(data["data"])
+                return {
+                    "image_url": image["thumb_1024_url"],
+                    "lat": image["computed_geometry"]["coordinates"][1],
+                    "lon": image["computed_geometry"]["coordinates"][0]
+                }
+        except Exception as e:
+            logger.warning(f"Попытка {attempt + 1}/{max_attempts} не удалась: {e}")
+            continue
+
+    return None
 
 
 @dp.message(F.text == "/start")
@@ -138,14 +192,28 @@ async def health_check(request):
     return web.Response(text="OK")
 
 
+async def get_photo_endpoint(request):
+    """API endpoint для получения случайного фото"""
+    photo_data = get_random_photo()
+
+    if photo_data:
+        return web.json_response(photo_data)
+    else:
+        return web.json_response(
+            {"error": "Не удалось загрузить фото"},
+            status=500
+        )
+
+
 async def main():
     """Запуск бота и веб-сервера"""
     logger.info("Бот запущен...")
 
-    # Запуск веб-сервера для health check
+    # Запуск веб-сервера для health check и API
     app = web.Application()
     app.router.add_get('/', health_check)
     app.router.add_get('/health', health_check)
+    app.router.add_get('/api/photo', get_photo_endpoint)
 
     runner = web.AppRunner(app)
     await runner.setup()
